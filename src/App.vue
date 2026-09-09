@@ -38,7 +38,9 @@
 
           <div
             class="text-subtitle2"
-            :class="$q.dark.isActive ? 'text-grey-4' : 'text-red-2'"
+            :class="$q.dark.isActive
+              ? 'text-grey-4'
+              : 'text-red-2'"
           >
             Control Pro de Celulares y Tablets
           </div>
@@ -388,7 +390,30 @@
                       class="q-mr-xs"
                     />
 
-                    {{ formatearFecha(servicio.fecha) }}
+                    {{ servicio.fecha }}
+
+                  </div>
+
+                </div>
+
+
+                <!-- HORA -->
+                <div class="col-12 col-sm-6 col-md-3">
+
+                  <div class="info-label">
+                    Hora de Ingreso
+                  </div>
+
+                  <div class="info-value">
+
+                    <q-icon
+                      name="schedule"
+                      color="red-7"
+                      size="sm"
+                      class="q-mr-xs"
+                    />
+
+                    {{ servicio.hora }}
 
                   </div>
 
@@ -404,7 +429,7 @@
 
                   <div class="info-value text-weight-bold text-red-7">
 
-                    ${{ formatearPrecio(servicio.precio) }}
+                    $ {{ formatearPrecio(servicio.precio) }} COP
 
                   </div>
 
@@ -432,20 +457,12 @@
                     :color="
                       servicio.estadoEquipo === 'Entregado'
                         ? 'green-1'
-                        : servicio.estadoEquipo === 'Devolución'
-                          ? 'red-2'
-                          : servicio.estadoEquipo === 'En revisión'
-                            ? 'orange-2'
-                            : 'blue-1'
+                        : 'blue-1'
                     "
                     :text-color="
                       servicio.estadoEquipo === 'Entregado'
                         ? 'green-9'
-                        : servicio.estadoEquipo === 'Devolución'
-                          ? 'red-9'
-                          : servicio.estadoEquipo === 'En revisión'
-                            ? 'orange-9'
-                            : 'blue-9'
+                        : 'blue-9'
                     "
                     class="text-weight-bold"
                   >
@@ -466,7 +483,7 @@
                   </strong>
 
                   <span class="text-green-6 text-weight-bold">
-                    ${{ formatearPrecio(servicio.abono) }}
+                    $ {{ formatearPrecio(servicio.abono) }} COP
                   </span>
 
                 </div>
@@ -544,7 +561,7 @@
 
               <!-- ENTREGAR -->
               <q-btn
-                v-if="servicio.estadoEquipo !== 'Entregado'"
+                v-if="servicio.estadoEquipo === 'Recibido'"
                 flat
                 dense
                 color="green-7"
@@ -674,8 +691,39 @@
               </div>
 
 
+              <!-- MARCA PERSONALIZADA -->
+              <div
+                v-if="servicioActual.marca === 'Otra'"
+                class="col-12 col-sm-6"
+              >
+
+                <q-input
+                  v-model.trim="servicioActual.marcaOtra"
+                  label="Especifique la marca *"
+                  outlined
+                  :dark="$q.dark.isActive"
+                  placeholder="Ej. Vivo"
+                  :rules="[
+                    val =>
+                      servicioActual.marca !== 'Otra' ||
+                      !!val ||
+                      'Escriba la marca'
+                  ]"
+                  input-class="text-body1"
+                  :readonly="servicioBloqueado"
+                />
+
+              </div>
+
+
               <!-- MODELO -->
-              <div class="col-12 col-sm-6">
+              <div
+                :class="
+                  servicioActual.marca === 'Otra'
+                    ? 'col-12'
+                    : 'col-12 col-sm-6'
+                "
+              >
 
                 <q-input
                   v-model.trim="servicioActual.modelo"
@@ -732,8 +780,39 @@
               </div>
 
 
+              <!-- SERVICIO PERSONALIZADO -->
+              <div
+                v-if="servicioActual.reparacion === 'Otra'"
+                class="col-12 col-sm-6"
+              >
+
+                <q-input
+                  v-model.trim="servicioActual.reparacionOtra"
+                  label="Especifique el servicio *"
+                  outlined
+                  :dark="$q.dark.isActive"
+                  placeholder="Ej. Cambio de cámara"
+                  :rules="[
+                    val =>
+                      servicioActual.reparacion !== 'Otra' ||
+                      !!val ||
+                      'Escriba el tipo de servicio'
+                  ]"
+                  input-class="text-body1"
+                  :readonly="servicioBloqueado"
+                />
+
+              </div>
+
+
               <!-- TECNICO -->
-              <div class="col-12 col-sm-6">
+              <div
+                :class="
+                  servicioActual.reparacion === 'Otra'
+                    ? 'col-12'
+                    : 'col-12 col-sm-6'
+                "
+              >
 
                 <q-select
                   v-model="servicioActual.tecnico"
@@ -755,29 +834,34 @@
             </div>
 
 
+            <!-- ========================================== -->
             <!-- PRECIO, ABONO Y ESTADO -->
+            <!-- ========================================== -->
+
             <div class="row q-col-gutter-sm">
 
-              <!-- PRECIO -->
+              <!-- PRECIO TOTAL -->
               <div class="col-12 col-sm-4">
 
                 <q-input
-                  v-model.number="servicioActual.precio"
+                  :model-value="precioFormateado"
+                  @update:model-value="actualizarPrecio"
                   label="Precio Total *"
-                  type="number"
                   prefix="$"
+                  suffix="COP"
                   outlined
                   :dark="$q.dark.isActive"
+                  placeholder="Ej. 150.000"
                   :rules="[
                     val =>
                       val !== null &&
                       val !== '' &&
-                      Number(val) >= 0
-                      ||
+                      Number(String(val).replace(/\./g, '')) >= 0 ||
                       'Ingrese un precio válido'
                   ]"
                   input-class="text-body1"
                   :readonly="servicioBloqueado"
+                  inputmode="numeric"
                 />
 
               </div>
@@ -787,40 +871,40 @@
               <div class="col-12 col-sm-4">
 
                 <q-input
-                  v-if="
-                    servicioActual.estadoPago === 'Abono'
-                  "
-                  v-model.number="servicioActual.abono"
+                  v-if="servicioActual.estadoPago === 'Abono'"
+                  :model-value="abonoFormateado"
+                  @update:model-value="actualizarAbono"
                   label="Valor del Abono *"
-                  type="number"
                   prefix="$"
+                  suffix="COP"
                   outlined
                   :dark="$q.dark.isActive"
+                  placeholder="Ej. 50.000"
                   :rules="[
 
                     val =>
                       val !== null &&
                       val !== '' &&
-                      Number(val) > 0
-                      ||
+                      Number(String(val).replace(/\./g, '')) > 0 ||
                       'Ingrese el valor del abono',
 
                     val =>
-                      Number(val) <=
-                      Number(servicioActual.precio)
-                      ||
+                      Number(String(val).replace(/\./g, '')) <=
+                      Number(servicioActual.precio) ||
                       'El abono no puede superar el precio total'
 
                   ]"
                   input-class="text-body1"
+                  inputmode="numeric"
                 />
 
 
                 <q-input
                   v-else
-                  :model-value="0"
+                  :model-value="'0'"
                   label="Abono"
                   prefix="$"
+                  suffix="COP"
                   outlined
                   readonly
                   :dark="$q.dark.isActive"
@@ -852,33 +936,66 @@
             </div>
 
 
-            <!-- ESTADO DEL EQUIPO -->
-            <q-select
-              v-model="servicioActual.estadoEquipo"
-              label="Estado del Equipo *"
-              outlined
-              :dark="$q.dark.isActive"
-              :options="estadosEquipo"
-              input-class="text-body1"
-              :rules="[
-                val =>
-                  !!val ||
-                  'Seleccione el estado del equipo'
-              ]"
-              hint="Puedes cambiar manualmente el estado del equipo"
-            />
-
-
-            <!-- FECHA AUTOMATICA -->
+            <!-- ESTADO DEL SERVICIO -->
             <q-input
-              v-model="servicioActual.fecha"
-              label="Fecha de Entrada"
+              v-model="servicioActual.estadoEquipo"
+              label="Estado del Servicio"
               outlined
               readonly
+              disable
               :dark="$q.dark.isActive"
               input-class="text-body1"
-              hint="La fecha se genera automáticamente"
+              hint="El estado cambia automáticamente"
             />
+
+
+            <!-- FECHA Y HORA -->
+            <div class="row q-col-gutter-sm">
+
+              <!-- FECHA -->
+              <div class="col-12 col-sm-6">
+
+                <q-input
+                  v-model="servicioActual.fecha"
+                  label="Fecha de Entrada"
+                  outlined
+                  readonly
+                  :dark="$q.dark.isActive"
+                  input-class="text-body1"
+                  hint="Formato: AAAA-MM-DD"
+                >
+
+                  <template v-slot:prepend>
+                    <q-icon name="event" />
+                  </template>
+
+                </q-input>
+
+              </div>
+
+
+              <!-- HORA -->
+              <div class="col-12 col-sm-6">
+
+                <q-input
+                  v-model="servicioActual.hora"
+                  label="Hora de Entrada"
+                  outlined
+                  readonly
+                  :dark="$q.dark.isActive"
+                  input-class="text-body1"
+                  hint="Formato: HH:mm"
+                >
+
+                  <template v-slot:prepend>
+                    <q-icon name="schedule" />
+                  </template>
+
+                </q-input>
+
+              </div>
+
+            </div>
 
 
             <!-- OBSERVACIONES -->
@@ -896,7 +1013,7 @@
           </q-card-section>
 
 
-          <!-- AVISO PARA SERVICIO ENTREGADO -->
+          <!-- AVISO SERVICIO ENTREGADO -->
           <q-card-section
             v-if="servicioBloqueado"
             class="q-px-md q-py-sm"
@@ -915,10 +1032,8 @@
               </template>
 
               Este equipo ya fue entregado.
-              Puedes modificar el
-              <strong>Estado del Equipo</strong>,
-              el <strong>Estado de Pago</strong>
-              y el valor del abono.
+              Los datos principales del servicio
+              permanecen bloqueados.
 
             </q-banner>
 
@@ -945,7 +1060,7 @@
               type="submit"
               color="red-9"
               :label="
-                servicioBloqueado
+                modoEdicion
                   ? 'Actualizar'
                   : 'Guardar Registro'
               "
@@ -1103,7 +1218,7 @@
 
 <script setup>
 
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 
 
@@ -1167,7 +1282,7 @@ const tiposReparacion = [
   'Pin de carga',
   'Software',
   'Diagnóstico',
-  'Otro'
+  'Otra'
 ]
 
 
@@ -1185,25 +1300,13 @@ const estadosPago = [
 ]
 
 
-/*
- * ESTADOS DEL EQUIPO
- *
- * Ahora incluye:
- * - Recibido
- * - En reparación
- * - En revisión
- * - Listo para entregar
- * - Entregado
- * - Devolución
- */
+/* ==========================================
+   ESTADOS DEL SERVICIO
+========================================== */
 
 const estadosEquipo = [
   'Recibido',
-  'En reparación',
-  'En revisión',
-  'Listo para entregar',
-  'Entregado',
-  'Devolución'
+  'Entregado'
 ]
 
 
@@ -1219,15 +1322,21 @@ const servicioInicial = () => ({
 
   marca: '',
 
+  marcaOtra: '',
+
   modelo: '',
 
   imei: '',
 
   reparacion: '',
 
+  reparacionOtra: '',
+
   tecnico: '',
 
   fecha: '',
+
+  hora: '',
 
   precio: 0,
 
@@ -1253,25 +1362,6 @@ const servicioActual = ref(
    SERVICIO BLOQUEADO
 ========================================== */
 
-/*
- * Si el servicio fue entregado:
- *
- * Se bloquean:
- * - Cliente
- * - Marca
- * - Modelo
- * - IMEI
- * - Reparación
- * - Técnico
- * - Precio
- * - Observaciones
- *
- * PERO SE PUEDEN CAMBIAR:
- * - Estado del Equipo
- * - Estado de Pago
- * - Abono
- */
-
 const servicioBloqueado = computed(() => {
 
   return (
@@ -1280,6 +1370,42 @@ const servicioBloqueado = computed(() => {
   )
 
 })
+
+
+/* ==========================================
+   MOSTRAR MARCA PERSONALIZADA
+========================================== */
+
+watch(
+  () => servicioActual.value.marca,
+  (nuevaMarca) => {
+
+    if (nuevaMarca !== 'Otra') {
+
+      servicioActual.value.marcaOtra = ''
+
+    }
+
+  }
+)
+
+
+/* ==========================================
+   MOSTRAR SERVICIO PERSONALIZADO
+========================================== */
+
+watch(
+  () => servicioActual.value.reparacion,
+  (nuevoServicio) => {
+
+    if (nuevoServicio !== 'Otra') {
+
+      servicioActual.value.reparacionOtra = ''
+
+    }
+
+  }
+)
 
 
 /* ==========================================
@@ -1365,7 +1491,21 @@ function obtenerFechaActual() {
       ahora.getDate()
     ).padStart(2, '0')
 
-  const hora =
+
+  return `${anio}-${mes}-${dia}`
+
+}
+
+
+/* ==========================================
+   HORA AUTOMATICA
+========================================== */
+
+function obtenerHoraActual() {
+
+  const ahora = new Date()
+
+  const horas =
     String(
       ahora.getHours()
     ).padStart(2, '0')
@@ -1376,7 +1516,7 @@ function obtenerFechaActual() {
     ).padStart(2, '0')
 
 
-  return `${anio}-${mes}-${dia}T${hora}:${minutos}`
+  return `${horas}:${minutos}`
 
 }
 
@@ -1394,6 +1534,9 @@ function nuevoServicio() {
   servicioActual.value.fecha =
     obtenerFechaActual()
 
+  servicioActual.value.hora =
+    obtenerHoraActual()
+
   servicioActual.value.estadoEquipo =
     'Recibido'
 
@@ -1403,19 +1546,74 @@ function nuevoServicio() {
 
 
 /* ==========================================
+   PRECIO FORMATEADO
+========================================== */
+
+const precioFormateado = computed(() => {
+
+  return formatearPrecio(
+    servicioActual.value.precio
+  )
+
+})
+
+
+/* ==========================================
+   ACTUALIZAR PRECIO
+========================================== */
+
+function actualizarPrecio(valor) {
+
+  const limpio =
+    String(valor || '')
+      .replace(/\./g, '')
+      .replace(/\D/g, '')
+
+  servicioActual.value.precio =
+    limpio === ''
+      ? 0
+      : Number(limpio)
+
+}
+
+
+/* ==========================================
+   ABONO FORMATEADO
+========================================== */
+
+const abonoFormateado = computed(() => {
+
+  return formatearPrecio(
+    servicioActual.value.abono
+  )
+
+})
+
+
+/* ==========================================
+   ACTUALIZAR ABONO
+========================================== */
+
+function actualizarAbono(valor) {
+
+  const limpio =
+    String(valor || '')
+      .replace(/\./g, '')
+      .replace(/\D/g, '')
+
+  servicioActual.value.abono =
+    limpio === ''
+      ? 0
+      : Number(limpio)
+
+}
+
+
+/* ==========================================
    GUARDAR
 ========================================== */
 
 function guardarServicio() {
-
-  /*
-   * Cuando el equipo ya fue entregado,
-   * permitimos actualizar:
-   *
-   * - Estado del equipo
-   * - Estado de pago
-   * - Abono
-   */
 
   if (servicioBloqueado.value) {
 
@@ -1428,9 +1626,7 @@ function guardarServicio() {
   }
 
 
-  /*
-   * Validaciones de campos obligatorios
-   */
+  /* VALIDAR CAMPOS */
 
   if (
     !servicioActual.value.cliente ||
@@ -1445,9 +1641,55 @@ function guardarServicio() {
   }
 
 
-  /*
-   * Validación del precio
-   */
+  /* VALIDAR MARCA PERSONALIZADA */
+
+  if (
+    servicioActual.value.marca === 'Otra' &&
+    !servicioActual.value.marcaOtra?.trim()
+  ) {
+
+    return
+
+  }
+
+
+  /* VALIDAR SERVICIO PERSONALIZADO */
+
+  if (
+    servicioActual.value.reparacion === 'Otra' &&
+    !servicioActual.value.reparacionOtra?.trim()
+  ) {
+
+    return
+
+  }
+
+
+  /* CONVERTIR MARCA PERSONALIZADA */
+
+  if (
+    servicioActual.value.marca === 'Otra'
+  ) {
+
+    servicioActual.value.marca =
+      servicioActual.value.marcaOtra.trim()
+
+  }
+
+
+  /* CONVERTIR SERVICIO PERSONALIZADO */
+
+  if (
+    servicioActual.value.reparacion === 'Otra'
+  ) {
+
+    servicioActual.value.reparacion =
+      servicioActual.value.reparacionOtra.trim()
+
+  }
+
+
+  /* VALIDAR PRECIO */
 
   if (
     servicioActual.value.precio === '' ||
@@ -1460,12 +1702,28 @@ function guardarServicio() {
   }
 
 
-  /*
-   * Validación del estado del equipo
-   */
+  /* CONVERTIR PRECIO A NUMERO */
+
+  servicioActual.value.precio =
+    Number(
+      servicioActual.value.precio || 0
+    )
+
+
+  /* SEGURIDAD ESTADO */
+
+  if (!modoEdicion.value) {
+
+    servicioActual.value.estadoEquipo =
+      'Recibido'
+
+  }
+
+
+  /* VALIDAR ESTADO PAGO */
 
   if (
-    !servicioActual.value.estadoEquipo
+    !servicioActual.value.estadoPago
   ) {
 
     return
@@ -1473,10 +1731,7 @@ function guardarServicio() {
   }
 
 
-  /*
-   * Si el estado es ABONO,
-   * debe existir un valor de abono.
-   */
+  /* VALIDAR ABONO */
 
   if (
     servicioActual.value.estadoPago === 'Abono'
@@ -1501,22 +1756,19 @@ function guardarServicio() {
 
     }
 
+
+    servicioActual.value.abono =
+      Number(servicioActual.value.abono)
+
   }
   else {
-
-    /*
-     * Si no es abono,
-     * el valor del abono queda en cero.
-     */
 
     servicioActual.value.abono = 0
 
   }
 
 
-  /*
-   * Guardar o editar
-   */
+  /* GUARDAR O EDITAR */
 
   if (modoEdicion.value) {
 
@@ -1556,9 +1808,17 @@ function actualizarServicioEntregado() {
   }
 
 
-  /*
-   * Validar estado de pago
-   */
+  if (
+    servicios.value[index].estadoEquipo !==
+    'Entregado'
+  ) {
+
+    return
+
+  }
+
+
+  /* VALIDAR ESTADO DE PAGO */
 
   if (
     !servicioActual.value.estadoPago
@@ -1569,9 +1829,7 @@ function actualizarServicioEntregado() {
   }
 
 
-  /*
-   * Validar abono
-   */
+  /* VALIDAR ABONO */
 
   if (
     servicioActual.value.estadoPago === 'Abono'
@@ -1604,23 +1862,11 @@ function actualizarServicioEntregado() {
   }
 
 
-  /*
-   * Actualizamos:
-   *
-   * - Estado del equipo
-   * - Estado de pago
-   * - Abono
-   *
-   * El resto de datos originales
-   * permanece intacto.
-   */
-
   servicios.value[index] = {
 
     ...servicios.value[index],
 
-    estadoEquipo:
-      servicioActual.value.estadoEquipo,
+    estadoEquipo: 'Entregado',
 
     estadoPago:
       servicioActual.value.estadoPago,
@@ -1641,10 +1887,6 @@ function actualizarServicioEntregado() {
 
 function agregarServicio() {
 
-  /*
-   * Se genera el ID ANTES de guardar.
-   */
-
   const nuevoId =
     Date.now()
 
@@ -1655,9 +1897,17 @@ function agregarServicio() {
 
     id: nuevoId,
 
-    estadoEquipo:
-      servicioActual.value.estadoEquipo ||
-      'Recibido',
+    precio:
+      Number(
+        servicioActual.value.precio || 0
+      ),
+
+    abono:
+      Number(
+        servicioActual.value.abono || 0
+      ),
+
+    estadoEquipo: 'Recibido',
 
     calificacion: 0
 
@@ -1675,19 +1925,121 @@ function cargarServicio(servicio) {
   modoEdicion.value = true
 
   servicioActual.value = {
-    ...servicio
+
+    ...servicio,
+
+    precio:
+      Number(
+        servicio.precio || 0
+      ),
+
+    abono:
+      Number(
+        servicio.abono || 0
+      ),
+
+    marcaOtra:
+      servicio.marcaOtra || '',
+
+    reparacionOtra:
+      servicio.reparacionOtra || ''
+
   }
 
 
-  /*
-   * Compatibilidad con registros antiguos.
-   *
-   * Si algún registro viejo no tiene estadoEquipo,
-   * se establece como Recibido.
-   */
+  /* COMPATIBILIDAD CON MARCAS PERSONALIZADAS ANTIGUAS */
 
   if (
-    !servicioActual.value.estadoEquipo
+    servicioActual.value.marca &&
+    !marcas.includes(servicioActual.value.marca)
+  ) {
+
+    servicioActual.value.marcaOtra =
+      servicioActual.value.marca
+
+    servicioActual.value.marca =
+      'Otra'
+
+  }
+
+
+  /* COMPATIBILIDAD CON SERVICIOS PERSONALIZADOS ANTIGUOS */
+
+  if (
+    servicioActual.value.reparacion &&
+    !tiposReparacion.includes(
+      servicioActual.value.reparacion
+    )
+  ) {
+
+    servicioActual.value.reparacionOtra =
+      servicioActual.value.reparacion
+
+    servicioActual.value.reparacion =
+      'Otra'
+
+  }
+
+
+  /* COMPATIBILIDAD FECHA */
+
+  if (
+    !servicioActual.value.fecha
+  ) {
+
+    servicioActual.value.fecha =
+      obtenerFechaActual()
+
+  }
+
+
+  /* COMPATIBILIDAD FECHA ANTIGUA */
+
+  if (
+    !servicioActual.value.hora
+  ) {
+
+    const fechaAntigua =
+      String(
+        servicioActual.value.fecha || ''
+      )
+
+
+    if (
+      fechaAntigua.includes('T')
+    ) {
+
+      const partes =
+        fechaAntigua.split('T')
+
+
+      servicioActual.value.fecha =
+        partes[0]
+
+
+      servicioActual.value.hora =
+        partes[1]
+          ? partes[1].substring(0, 5)
+          : obtenerHoraActual()
+
+    }
+    else {
+
+      servicioActual.value.hora =
+        obtenerHoraActual()
+
+    }
+
+  }
+
+
+  /* SEGURIDAD ESTADO */
+
+  if (
+    servicioActual.value.estadoEquipo !==
+      'Recibido' &&
+    servicioActual.value.estadoEquipo !==
+      'Entregado'
   ) {
 
     servicioActual.value.estadoEquipo =
@@ -1696,10 +2048,7 @@ function cargarServicio(servicio) {
   }
 
 
-  /*
-   * Compatibilidad con registros antiguos
-   * sin calificación.
-   */
+  /* COMPATIBILIDAD CALIFICACION */
 
   if (
     servicioActual.value.calificacion ===
@@ -1737,14 +2086,7 @@ function editarServicio() {
   }
 
 
-  /*
-   * Si originalmente estaba entregado,
-   * solamente permitimos cambiar:
-   *
-   * - Estado del equipo
-   * - Estado de pago
-   * - Abono
-   */
+  /* ENTREGADO */
 
   if (
     servicios.value[index].estadoEquipo ===
@@ -1758,18 +2100,25 @@ function editarServicio() {
   }
 
 
-  /*
-   * Servicio todavía no entregado:
-   * se puede modificar normalmente.
-   */
+  /* RECIBIDO */
 
   servicios.value[index] = {
 
     ...servicioActual.value,
 
+    precio:
+      Number(
+        servicioActual.value.precio || 0
+      ),
+
+    estadoEquipo:
+      'Recibido',
+
     abono:
       servicioActual.value.estadoPago === 'Abono'
-        ? Number(servicioActual.value.abono || 0)
+        ? Number(
+            servicioActual.value.abono || 0
+          )
         : 0
 
   }
@@ -1782,10 +2131,6 @@ function editarServicio() {
 ========================================== */
 
 function confirmarEliminar(servicio) {
-
-  /*
-   * Los entregados no se pueden eliminar.
-   */
 
   if (
     servicio.estadoEquipo === 'Entregado'
@@ -1819,10 +2164,6 @@ function eliminarConfirmado() {
 
   }
 
-
-  /*
-   * Seguridad adicional
-   */
 
   if (
     servicioAEliminar.value.estadoEquipo ===
@@ -1877,14 +2218,9 @@ function entregarServicio(servicio) {
   }
 
 
-  /*
-   * Si ya está entregado,
-   * no hacemos nada.
-   */
-
   if (
-    servicios.value[index].estadoEquipo ===
-    'Entregado'
+    servicios.value[index].estadoEquipo !==
+    'Recibido'
   ) {
 
     return
@@ -1896,8 +2232,7 @@ function entregarServicio(servicio) {
 
     ...servicios.value[index],
 
-    estadoEquipo:
-      'Entregado'
+    estadoEquipo: 'Entregado'
 
   }
 
@@ -1913,11 +2248,6 @@ function entregarServicio(servicio) {
 ========================================== */
 
 function abrirCalificacion(servicio) {
-
-  /*
-   * Solo se puede calificar
-   * cuando el equipo fue entregado.
-   */
 
   if (
     servicio.estadoEquipo !==
@@ -2014,11 +2344,6 @@ function guardarCalificacion() {
   }
 
 
-  /*
-   * Solo puede calificarse
-   * un servicio entregado.
-   */
-
   if (
     servicios.value[index].estadoEquipo !==
     'Entregado'
@@ -2057,23 +2382,9 @@ function guardarCalificacion() {
 
 function contarPendientes() {
 
-  /*
-   * En taller:
-   *
-   * - Recibido
-   * - En reparación
-   * - En revisión
-   * - Listo para entregar
-   *
-   * No cuenta:
-   * - Entregado
-   * - Devolución
-   */
-
   return servicios.value.filter(
     s =>
-      s.estadoEquipo !== 'Entregado' &&
-      s.estadoEquipo !== 'Devolución'
+      s.estadoEquipo === 'Recibido'
   ).length
 
 }
@@ -2083,8 +2394,7 @@ function contarPagados() {
 
   return servicios.value.filter(
     s =>
-      s.estadoPago ===
-      'Pagado'
+      s.estadoPago === 'Pagado'
   ).length
 
 }
@@ -2092,6 +2402,7 @@ function contarPagados() {
 
 /* ==========================================
    FORMATEAR PRECIO
+   PESOS COLOMBIANOS
 ========================================== */
 
 function formatearPrecio(precio) {
@@ -2107,27 +2418,26 @@ function formatearPrecio(precio) {
   }
 
 
-  return Number(precio)
-    .toLocaleString('es-CO')
-
-}
+  const numero =
+    Number(precio)
 
 
-/* ==========================================
-   FORMATEAR FECHA
-========================================== */
+  if (
+    Number.isNaN(numero)
+  ) {
 
-function formatearFecha(fecha) {
-
-  if (!fecha) {
-
-    return ''
+    return '0'
 
   }
 
 
-  return String(fecha)
-    .replace('T', ' ')
+  return numero.toLocaleString(
+    'es-CO',
+    {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }
+  )
 
 }
 
