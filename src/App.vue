@@ -429,8 +429,24 @@
 
                   <q-chip
                     dense
-                    color="blue-1"
-                    text-color="blue-9"
+                    :color="
+                      servicio.estadoEquipo === 'Entregado'
+                        ? 'green-1'
+                        : servicio.estadoEquipo === 'Devolución'
+                          ? 'red-2'
+                          : servicio.estadoEquipo === 'En revisión'
+                            ? 'orange-2'
+                            : 'blue-1'
+                    "
+                    :text-color="
+                      servicio.estadoEquipo === 'Entregado'
+                        ? 'green-9'
+                        : servicio.estadoEquipo === 'Devolución'
+                          ? 'red-9'
+                          : servicio.estadoEquipo === 'En revisión'
+                            ? 'orange-9'
+                            : 'blue-9'
+                    "
                     class="text-weight-bold"
                   >
                     {{ servicio.estadoEquipo }}
@@ -539,11 +555,6 @@
 
 
               <!-- MODIFICAR -->
-              <!--
-                IMPORTANTE:
-                Ahora también aparece cuando está entregado,
-                porque necesitamos poder cambiar el estado de pago.
-              -->
               <q-btn
                 flat
                 dense
@@ -844,13 +855,17 @@
             <!-- ESTADO DEL EQUIPO -->
             <q-select
               v-model="servicioActual.estadoEquipo"
-              label="Estado del Equipo"
+              label="Estado del Equipo *"
               outlined
-              readonly
               :dark="$q.dark.isActive"
               :options="estadosEquipo"
               input-class="text-body1"
-              hint="El estado del equipo se controla desde el botón Entregar"
+              :rules="[
+                val =>
+                  !!val ||
+                  'Seleccione el estado del equipo'
+              ]"
+              hint="Puedes cambiar manualmente el estado del equipo"
             />
 
 
@@ -900,8 +915,9 @@
               </template>
 
               Este equipo ya fue entregado.
-              Solo puedes modificar el
-              <strong>Estado de Pago</strong>
+              Puedes modificar el
+              <strong>Estado del Equipo</strong>,
+              el <strong>Estado de Pago</strong>
               y el valor del abono.
 
             </q-banner>
@@ -930,7 +946,7 @@
               color="red-9"
               :label="
                 servicioBloqueado
-                  ? 'Actualizar Pago'
+                  ? 'Actualizar'
                   : 'Guardar Registro'
               "
               unelevated
@@ -1169,11 +1185,25 @@ const estadosPago = [
 ]
 
 
+/*
+ * ESTADOS DEL EQUIPO
+ *
+ * Ahora incluye:
+ * - Recibido
+ * - En reparación
+ * - En revisión
+ * - Listo para entregar
+ * - Entregado
+ * - Devolución
+ */
+
 const estadosEquipo = [
   'Recibido',
   'En reparación',
+  'En revisión',
   'Listo para entregar',
-  'Entregado'
+  'Entregado',
+  'Devolución'
 ]
 
 
@@ -1224,12 +1254,22 @@ const servicioActual = ref(
 ========================================== */
 
 /*
- * Si estamos editando un servicio que ya fue
- * entregado, bloqueamos todos los campos excepto
- * Estado de Pago y Abono.
+ * Si el servicio fue entregado:
  *
- * Esto permite cobrar posteriormente un equipo
- * que fue entregado con pago pendiente.
+ * Se bloquean:
+ * - Cliente
+ * - Marca
+ * - Modelo
+ * - IMEI
+ * - Reparación
+ * - Técnico
+ * - Precio
+ * - Observaciones
+ *
+ * PERO SE PUEDEN CAMBIAR:
+ * - Estado del Equipo
+ * - Estado de Pago
+ * - Abono
  */
 
 const servicioBloqueado = computed(() => {
@@ -1370,12 +1410,16 @@ function guardarServicio() {
 
   /*
    * Cuando el equipo ya fue entregado,
-   * solamente permitimos modificar el pago.
+   * permitimos actualizar:
+   *
+   * - Estado del equipo
+   * - Estado de pago
+   * - Abono
    */
 
   if (servicioBloqueado.value) {
 
-    actualizarPagoServicio()
+    actualizarServicioEntregado()
 
     mostrarModal.value = false
 
@@ -1409,6 +1453,19 @@ function guardarServicio() {
     servicioActual.value.precio === '' ||
     servicioActual.value.precio === null ||
     Number(servicioActual.value.precio) < 0
+  ) {
+
+    return
+
+  }
+
+
+  /*
+   * Validación del estado del equipo
+   */
+
+  if (
+    !servicioActual.value.estadoEquipo
   ) {
 
     return
@@ -1479,10 +1536,10 @@ function guardarServicio() {
 
 
 /* ==========================================
-   ACTUALIZAR SOLO EL PAGO
+   ACTUALIZAR SERVICIO ENTREGADO
 ========================================== */
 
-function actualizarPagoServicio() {
+function actualizarServicioEntregado() {
 
   const index =
     servicios.value.findIndex(
@@ -1513,8 +1570,7 @@ function actualizarPagoServicio() {
 
 
   /*
-   * Si cambia a ABONO,
-   * validar el valor.
+   * Validar abono
    */
 
   if (
@@ -1543,30 +1599,36 @@ function actualizarPagoServicio() {
   }
   else {
 
-    /*
-     * Pendiente o Pagado:
-     * no deben conservar un abono.
-     */
-
     servicioActual.value.abono = 0
 
   }
 
 
   /*
-   * Conservamos TODOS los datos originales
-   * y solamente cambiamos pago y abono.
+   * Actualizamos:
+   *
+   * - Estado del equipo
+   * - Estado de pago
+   * - Abono
+   *
+   * El resto de datos originales
+   * permanece intacto.
    */
 
   servicios.value[index] = {
 
     ...servicios.value[index],
 
+    estadoEquipo:
+      servicioActual.value.estadoEquipo,
+
     estadoPago:
       servicioActual.value.estadoPago,
 
     abono:
-      Number(servicioActual.value.abono || 0)
+      Number(
+        servicioActual.value.abono || 0
+      )
 
   }
 
@@ -1593,7 +1655,9 @@ function agregarServicio() {
 
     id: nuevoId,
 
-    estadoEquipo: 'Recibido',
+    estadoEquipo:
+      servicioActual.value.estadoEquipo ||
+      'Recibido',
 
     calificacion: 0
 
@@ -1608,18 +1672,42 @@ function agregarServicio() {
 
 function cargarServicio(servicio) {
 
-  /*
-   * Ahora SI permitimos abrir un servicio
-   * entregado.
-   *
-   * Si está entregado, los campos quedan
-   * bloqueados excepto el pago.
-   */
-
   modoEdicion.value = true
 
   servicioActual.value = {
     ...servicio
+  }
+
+
+  /*
+   * Compatibilidad con registros antiguos.
+   *
+   * Si algún registro viejo no tiene estadoEquipo,
+   * se establece como Recibido.
+   */
+
+  if (
+    !servicioActual.value.estadoEquipo
+  ) {
+
+    servicioActual.value.estadoEquipo =
+      'Recibido'
+
+  }
+
+
+  /*
+   * Compatibilidad con registros antiguos
+   * sin calificación.
+   */
+
+  if (
+    servicioActual.value.calificacion ===
+    undefined
+  ) {
+
+    servicioActual.value.calificacion = 0
+
   }
 
 
@@ -1650,8 +1738,12 @@ function editarServicio() {
 
 
   /*
-   * Si está entregado, solamente actualizar
-   * estado de pago y abono.
+   * Si originalmente estaba entregado,
+   * solamente permitimos cambiar:
+   *
+   * - Estado del equipo
+   * - Estado de pago
+   * - Abono
    */
 
   if (
@@ -1659,7 +1751,7 @@ function editarServicio() {
     'Entregado'
   ) {
 
-    actualizarPagoServicio()
+    actualizarServicioEntregado()
 
     return
 
@@ -1673,7 +1765,12 @@ function editarServicio() {
 
   servicios.value[index] = {
 
-    ...servicioActual.value
+    ...servicioActual.value,
+
+    abono:
+      servicioActual.value.estadoPago === 'Abono'
+        ? Number(servicioActual.value.abono || 0)
+        : 0
 
   }
 
@@ -1799,7 +1896,8 @@ function entregarServicio(servicio) {
 
     ...servicios.value[index],
 
-    estadoEquipo: 'Entregado'
+    estadoEquipo:
+      'Entregado'
 
   }
 
@@ -1959,10 +2057,23 @@ function guardarCalificacion() {
 
 function contarPendientes() {
 
+  /*
+   * En taller:
+   *
+   * - Recibido
+   * - En reparación
+   * - En revisión
+   * - Listo para entregar
+   *
+   * No cuenta:
+   * - Entregado
+   * - Devolución
+   */
+
   return servicios.value.filter(
     s =>
-      s.estadoEquipo !==
-      'Entregado'
+      s.estadoEquipo !== 'Entregado' &&
+      s.estadoEquipo !== 'Devolución'
   ).length
 
 }
@@ -2123,7 +2234,7 @@ function formatearFecha(fecha) {
 
 
 /* ==========================================
-   COLORES DE ESTADO
+   COLORES DE ESTADO DE PAGO
 ========================================== */
 
 .border-pending {
