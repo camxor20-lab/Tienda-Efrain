@@ -539,8 +539,12 @@
 
 
               <!-- MODIFICAR -->
+              <!--
+                IMPORTANTE:
+                Ahora también aparece cuando está entregado,
+                porque necesitamos poder cambiar el estado de pago.
+              -->
               <q-btn
-                v-if="servicio.estadoEquipo !== 'Entregado'"
                 flat
                 dense
                 color="red-7"
@@ -631,6 +635,7 @@
                   'El nombre del cliente es obligatorio'
               ]"
               input-class="text-body1"
+              :readonly="servicioBloqueado"
             />
 
 
@@ -652,6 +657,7 @@
                       'Seleccione una marca'
                   ]"
                   input-class="text-body1"
+                  :readonly="servicioBloqueado"
                 />
 
               </div>
@@ -672,6 +678,7 @@
                       'El modelo es obligatorio'
                   ]"
                   input-class="text-body1"
+                  :readonly="servicioBloqueado"
                 />
 
               </div>
@@ -686,6 +693,7 @@
               outlined
               :dark="$q.dark.isActive"
               input-class="text-body1"
+              :readonly="servicioBloqueado"
             />
 
 
@@ -707,6 +715,7 @@
                       'Seleccione el tipo de servicio'
                   ]"
                   input-class="text-body1"
+                  :readonly="servicioBloqueado"
                 />
 
               </div>
@@ -727,6 +736,7 @@
                       'Seleccione un técnico'
                   ]"
                   input-class="text-body1"
+                  :readonly="servicioBloqueado"
                 />
 
               </div>
@@ -756,6 +766,7 @@
                       'Ingrese un precio válido'
                   ]"
                   input-class="text-body1"
+                  :readonly="servicioBloqueado"
                 />
 
               </div>
@@ -839,7 +850,7 @@
               :dark="$q.dark.isActive"
               :options="estadosEquipo"
               input-class="text-body1"
-              hint="El estado inicial de un nuevo equipo es Recibido"
+              hint="El estado del equipo se controla desde el botón Entregar"
             />
 
 
@@ -864,7 +875,36 @@
               :dark="$q.dark.isActive"
               rows="3"
               input-class="text-body1"
+              :readonly="servicioBloqueado"
             />
+
+          </q-card-section>
+
+
+          <!-- AVISO PARA SERVICIO ENTREGADO -->
+          <q-card-section
+            v-if="servicioBloqueado"
+            class="q-px-md q-py-sm"
+          >
+
+            <q-banner
+              rounded
+              class="bg-orange-1 text-orange-10"
+            >
+
+              <template v-slot:avatar>
+                <q-icon
+                  name="info"
+                  color="orange-8"
+                />
+              </template>
+
+              Este equipo ya fue entregado.
+              Solo puedes modificar el
+              <strong>Estado de Pago</strong>
+              y el valor del abono.
+
+            </q-banner>
 
           </q-card-section>
 
@@ -888,7 +928,11 @@
             <q-btn
               type="submit"
               color="red-9"
-              label="Guardar Registro"
+              :label="
+                servicioBloqueado
+                  ? 'Actualizar Pago'
+                  : 'Guardar Registro'
+              "
               unelevated
             />
 
@@ -1176,6 +1220,29 @@ const servicioActual = ref(
 
 
 /* ==========================================
+   SERVICIO BLOQUEADO
+========================================== */
+
+/*
+ * Si estamos editando un servicio que ya fue
+ * entregado, bloqueamos todos los campos excepto
+ * Estado de Pago y Abono.
+ *
+ * Esto permite cobrar posteriormente un equipo
+ * que fue entregado con pago pendiente.
+ */
+
+const servicioBloqueado = computed(() => {
+
+  return (
+    modoEdicion.value &&
+    servicioActual.value.estadoEquipo === 'Entregado'
+  )
+
+})
+
+
+/* ==========================================
    FILTROS
 ========================================== */
 
@@ -1302,6 +1369,22 @@ function nuevoServicio() {
 function guardarServicio() {
 
   /*
+   * Cuando el equipo ya fue entregado,
+   * solamente permitimos modificar el pago.
+   */
+
+  if (servicioBloqueado.value) {
+
+    actualizarPagoServicio()
+
+    mostrarModal.value = false
+
+    return
+
+  }
+
+
+  /*
    * Validaciones de campos obligatorios
    */
 
@@ -1335,7 +1418,7 @@ function guardarServicio() {
 
   /*
    * Si el estado es ABONO,
-   * debe existir un valor de abono
+   * debe existir un valor de abono.
    */
 
   if (
@@ -1396,6 +1479,101 @@ function guardarServicio() {
 
 
 /* ==========================================
+   ACTUALIZAR SOLO EL PAGO
+========================================== */
+
+function actualizarPagoServicio() {
+
+  const index =
+    servicios.value.findIndex(
+      s =>
+        s.id ===
+        servicioActual.value.id
+    )
+
+
+  if (index === -1) {
+
+    return
+
+  }
+
+
+  /*
+   * Validar estado de pago
+   */
+
+  if (
+    !servicioActual.value.estadoPago
+  ) {
+
+    return
+
+  }
+
+
+  /*
+   * Si cambia a ABONO,
+   * validar el valor.
+   */
+
+  if (
+    servicioActual.value.estadoPago === 'Abono'
+  ) {
+
+    if (
+      !servicioActual.value.abono ||
+      Number(servicioActual.value.abono) <= 0
+    ) {
+
+      return
+
+    }
+
+
+    if (
+      Number(servicioActual.value.abono) >
+      Number(servicioActual.value.precio)
+    ) {
+
+      return
+
+    }
+
+  }
+  else {
+
+    /*
+     * Pendiente o Pagado:
+     * no deben conservar un abono.
+     */
+
+    servicioActual.value.abono = 0
+
+  }
+
+
+  /*
+   * Conservamos TODOS los datos originales
+   * y solamente cambiamos pago y abono.
+   */
+
+  servicios.value[index] = {
+
+    ...servicios.value[index],
+
+    estadoPago:
+      servicioActual.value.estadoPago,
+
+    abono:
+      Number(servicioActual.value.abono || 0)
+
+  }
+
+}
+
+
+/* ==========================================
    AGREGAR SERVICIO
 ========================================== */
 
@@ -1403,7 +1581,6 @@ function agregarServicio() {
 
   /*
    * Se genera el ID ANTES de guardar.
-   * Esto evita que quede null.
    */
 
   const nuevoId =
@@ -1432,18 +1609,12 @@ function agregarServicio() {
 function cargarServicio(servicio) {
 
   /*
-   * Un servicio entregado
-   * no puede modificarse.
+   * Ahora SI permitimos abrir un servicio
+   * entregado.
+   *
+   * Si está entregado, los campos quedan
+   * bloqueados excepto el pago.
    */
-
-  if (
-    servicio.estadoEquipo === 'Entregado'
-  ) {
-
-    return
-
-  }
-
 
   modoEdicion.value = true
 
@@ -1479,9 +1650,8 @@ function editarServicio() {
 
 
   /*
-   * Seguridad:
-   * si el registro ya fue entregado,
-   * no se puede modificar.
+   * Si está entregado, solamente actualizar
+   * estado de pago y abono.
    */
 
   if (
@@ -1489,10 +1659,17 @@ function editarServicio() {
     'Entregado'
   ) {
 
+    actualizarPagoServicio()
+
     return
 
   }
 
+
+  /*
+   * Servicio todavía no entregado:
+   * se puede modificar normalmente.
+   */
 
   servicios.value[index] = {
 
